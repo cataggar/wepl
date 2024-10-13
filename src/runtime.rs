@@ -221,17 +221,12 @@ impl Runtime {
                 }
                 let store = self.import_impls.store.clone();
 
-                let export_func = {
-                    let mut exports = export_instance.exports(&mut *store_lock);
-                    let mut export_instance = exports
-                        .instance(&export_ident.to_string())
-                        .with_context(|| {
-                            format!("no exported instance named '{export_ident} found'")
-                        })?;
-                    export_instance
-                        .func(fun_name)
-                        .with_context(|| format!("no exported function named '{fun_name}' found"))?
-                };
+                let export_func_name = &export_ident.to_string();
+                let export_func = export_instance
+                    .get_func(&mut *store_lock, export_func_name)
+                    .with_context(|| {
+                        format!("no exported function named '{export_func_name}' found")
+                    })?;
                 import_instance.func_new(fun_name, move |_ctx, args, results| {
                     let mut store = store.lock().unwrap();
                     export_func.call(&mut *store, args, results)?;
@@ -274,11 +269,7 @@ impl Runtime {
             let export_instance = linker.instantiate(&mut *store_lock, &component)?;
             match export_ident.interface {
                 Some(interface) => {
-                    let mut export = export_instance.exports(&mut *store_lock);
-                    let mut instance = export
-                        .instance(&interface.to_string())
-                        .with_context(|| format!("no export named '{interface} found'"))?;
-                    instance.func(export_ident.item)
+                    export_instance.get_func(&mut *store_lock, &interface.to_string())
                 }
                 None => export_instance.get_func(&mut *store_lock, export_ident.item),
             }
